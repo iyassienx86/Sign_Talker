@@ -1,14 +1,11 @@
 import cv2
 import mediapipe as mp
 import math
-import pyttsx3 # <--- The Voice Engine
+import os
+from gtts import gTTS # <--- Human Voice Library
+import playsound # You might need: pip install playsound==1.2.2
 
-def run_unit5():
-    # --- 1. INITIALIZE VOICE ---
-    engine = pyttsx3.init()
-    engine.setProperty('rate', 150)    # Normal talking speed
-    engine.setProperty('volume', 1.0)  # Full volume
-
+def run_unit5_final():
     cap = cv2.VideoCapture(0)
     mp_hands = mp.solutions.hands
     hands = mp_hands.Hands(model_complexity=0, max_num_hands=1, 
@@ -20,7 +17,7 @@ def run_unit5():
     
     is_locked = False
     reached_five = False
-    has_spoken = False # <--- This prevents the "Robot Loop"
+    has_spoken = False 
     display_text = "Waiting..."
 
     def get_dist(p1, p2):
@@ -68,22 +65,21 @@ def run_unit5():
                     cv2.putText(frame, f"{hand_label.upper()} | FINGERS: {count}", (20, 35), 
                                 cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 255), 2)
 
-        # --- 2. THE VOICE TRIGGER (The Magic Part) ---
+        # --- THE HUMAN VOICE TRIGGER ---
         if is_locked and not has_spoken:
-            # We show the locked frame first so the UI doesn't freeze while talking
-            overlay = frame.copy()
-            cv2.rectangle(overlay, (0, h-80), (w, h), (0, 0, 0), -1)
-            frame = cv2.addWeighted(overlay, 0.5, frame, 0.5, 0)
-            cv2.rectangle(frame, (0, 0), (w, h), color_locked, 15)
+            # Render the UI one last time so it doesn't freeze
             cv2.imshow("Sign Talker Final", frame)
             cv2.waitKey(1)
             
-            # SPEAK
-            engine.say(full_sentence)
-            engine.runAndWait()
-            has_spoken = True # LOCK THE VOICE
+            print("Generating High Quality Voice...")
+            tts = gTTS(text=full_sentence, lang='en', slow=False)
+            tts.save("help.mp3")
+            
+            # Playing the sound
+            os.system("mpg123 help.mp3") # 'mpg123' is the most reliable player for Linux
+            has_spoken = True 
 
-        # --- 3. UI RENDER ---
+        # --- UI RENDER ---
         overlay = frame.copy()
         cv2.rectangle(overlay, (0, h-80), (w, h), (0, 0, 0), -1)
         frame = cv2.addWeighted(overlay, 0.5, frame, 0.5, 0)
@@ -104,9 +100,10 @@ def run_unit5():
             reached_five = False
             has_spoken = False
             display_text = "Waiting..."
+            if os.path.exists("help.mp3"): os.remove("help.mp3")
 
     cap.release()
     cv2.destroyAllWindows()
 
 if __name__ == "__main__":
-    run_unit5()
+    run_unit5_final()
