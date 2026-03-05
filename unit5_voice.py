@@ -2,14 +2,19 @@ import cv2
 import mediapipe as mp
 import math
 import os
-from gtts import gTTS # <--- Human Voice Library
-import playsound # You might need: pip install playsound==1.2.2
+import time
+import threading # NEW: Prevents the video from freezing
+from gtts import gTTS 
 
 def run_unit5_final():
     cap = cv2.VideoCapture(0)
     mp_hands = mp.solutions.hands
-    hands = mp_hands.Hands(model_complexity=0, max_num_hands=1, 
-                           min_detection_confidence=0.7, min_tracking_confidence=0.5)
+    hands = mp_hands.Hands(
+        model_complexity=0, 
+        max_num_hands=1, 
+        min_detection_confidence=0.7, 
+        min_tracking_confidence=0.5
+    )
     mp_draw = mp.solutions.drawing_utils
 
     word_map = {1: "Please", 2: "I", 3: "Need", 4: "Medical", 5: "Help"}
@@ -22,6 +27,10 @@ def run_unit5_final():
 
     def get_dist(p1, p2):
         return math.sqrt((p1.x - p2.x)**2 + (p1.y - p2.y)**2)
+
+    # Helper function for background audio
+    def play_audio_async(file_path):
+        os.system(f"mpg123 -q {file_path}")
 
     while cap.isOpened():
         success, frame = cap.read()
@@ -61,25 +70,31 @@ def run_unit5_final():
 
                     mp_draw.draw_landmarks(frame, hand_lms, mp_hands.HAND_CONNECTIONS)
                     
+                    # Top Info Bar
                     cv2.rectangle(frame, (0, 0), (w, 50), (40, 40, 40), -1)
                     cv2.putText(frame, f"{hand_label.upper()} | FINGERS: {count}", (20, 35), 
                                 cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 255), 2)
 
-        # --- THE HUMAN VOICE TRIGGER ---
+        # --- 2. THE HUMAN VOICE TRIGGER (THREADED - NO FREEZE) ---
         if is_locked and not has_spoken:
-            # Render the UI one last time so it doesn't freeze
-            cv2.imshow("Sign Talker Final", frame)
-            cv2.waitKey(1)
-            
-            print("Generating High Quality Voice...")
-            tts = gTTS(text=full_sentence, lang='en', slow=False)
-            tts.save("help.mp3")
-            
-            # Playing the sound
-            os.system("mpg123 help.mp3") # 'mpg123' is the most reliable player for Linux
-            has_spoken = True 
+            print("Generating Human Voice...")
+            try:
+                # 1. Generate audio file
+                tts = gTTS(text=full_sentence, lang='en', slow=False)
+                tts.save("help.mp3")
+                
+                # 2. Use Threading to play sound in the background
+                # This prevents the camera 'while' loop from stopping
+                audio_thread = threading.Thread(target=play_audio_async, args=("help.mp3",))
+                audio_thread.start()
+                
+                has_spoken = True 
+                print("Voice thread started successfully!")
+            except Exception as e:
+                print(f"Audio Error: {e}")
+                has_spoken = True 
 
-        # --- UI RENDER ---
+        # --- 3. UI RENDER ---
         overlay = frame.copy()
         cv2.rectangle(overlay, (0, h-80), (w, h), (0, 0, 0), -1)
         frame = cv2.addWeighted(overlay, 0.5, frame, 0.5, 0)
@@ -100,7 +115,7 @@ def run_unit5_final():
             reached_five = False
             has_spoken = False
             display_text = "Waiting..."
-            if os.path.exists("help.mp3"): os.remove("help.mp3")
+            # Note: We don't delete the file immediately because the thread might still be playing it
 
     cap.release()
     cv2.destroyAllWindows()
