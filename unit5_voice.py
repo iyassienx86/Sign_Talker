@@ -7,6 +7,7 @@ import threading # NEW: Prevents the video from freezing
 from gtts import gTTS 
 
 def run_unit5_final():
+    # --- 1. SETUP: Opens the camera and the digital "eyes" for hand tracking ---
     cap = cv2.VideoCapture(0)
     mp_hands = mp.solutions.hands
     hands = mp_hands.Hands(
@@ -17,6 +18,7 @@ def run_unit5_final():
     )
     mp_draw = mp.solutions.drawing_utils
 
+    # --- 2. DICTIONARY: Maps the number of fingers to specific words ---
     word_map = {1: "Please", 2: "I", 3: "Need", 4: "Medical", 5: "Help"}
     full_sentence = "PLEASE I NEED MEDICAL HELP"
     
@@ -52,7 +54,7 @@ def run_unit5_final():
                     lms = hand_lms.landmark
                     fingers = []
 
-                    # THE PERFECT AI LOGIC
+                    # --- 3. LOGIC: Checks if each finger is "up" or "down" ---
                     thumb_dist = get_dist(lms[4], lms[17])
                     fingers.append(1 if thumb_dist > 0.18 else 0)
 
@@ -61,6 +63,7 @@ def run_unit5_final():
 
                     count = fingers.count(1)
 
+                    # --- 4. TRIGGER: If hand opens (5) then closes (0), lock the help signal ---
                     if count > 0:
                         display_text = word_map.get(count, "...")
                         if count == 5: reached_five = True 
@@ -75,7 +78,7 @@ def run_unit5_final():
                     cv2.putText(frame, f"{hand_label.upper()} | FINGERS: {count}", (20, 35), 
                                 cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 255), 2)
 
-        # --- 2. THE HUMAN VOICE TRIGGER (THREADED - NO FREEZE) ---
+        # --- 5. VOICE: Creates and plays the speech without freezing the video ---
         if is_locked and not has_spoken:
             print("Generating Human Voice...")
             try:
@@ -94,7 +97,7 @@ def run_unit5_final():
                 print(f"Audio Error: {e}")
                 has_spoken = True 
 
-        # --- 3. UI RENDER ---
+        # --- 6. VISUALS: Draws the text and the red "emergency" border ---
         overlay = frame.copy()
         cv2.rectangle(overlay, (0, h-80), (w, h), (0, 0, 0), -1)
         frame = cv2.addWeighted(overlay, 0.5, frame, 0.5, 0)
@@ -108,6 +111,7 @@ def run_unit5_final():
 
         cv2.imshow("Sign Talker Final", frame)
         
+        # --- 7. CONTROLS: 'q' to quit, 'r' to reset the system ---
         key = cv2.waitKey(1) & 0xFF
         if key == ord('q'): break
         if key == ord('r'):
